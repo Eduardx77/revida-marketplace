@@ -20,21 +20,15 @@ export default async function ProductDetailPage(props: Props) {
   console.log('🔍 ProductDetailPage - Loading ID:', productId)
 
   // Usar URL del servidor para obtener el producto
-  const baseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000'
-
   let product: any = null
   let error: string | null = null
 
   try {
-    console.log('🌐 Fetching from:', `${baseUrl}/api/products/${productId}`)
+    const apiUrl = `/api/products/${productId}`
+    console.log('🌐 Fetching from:', apiUrl)
     
-    const response = await fetch(`${baseUrl}/api/products/${productId}`, {
+    const response = await fetch(apiUrl, {
       cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
 
     console.log('📊 Response status:', response.status)
