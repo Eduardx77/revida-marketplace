@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Heart, MapPin, Package, ArrowLeft, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ProductImage } from '@/components/product-image'
 import { getProducts, getCategories, toggleFavorite } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/client'
 
@@ -165,7 +166,7 @@ export default function MarketplacePage() {
                   className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden hover:scale-105"
                 >
                   <div className="relative h-48 bg-green-100 overflow-hidden">
-                    <img
+                    <ProductImage
                       src={product.images?.[0] || 'https://via.placeholder.com/300x200?text=No+Image'}
                       alt={product.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform"

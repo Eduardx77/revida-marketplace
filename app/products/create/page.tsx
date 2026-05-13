@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { ChevronLeft, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { createClient } from '@/lib/supabase/client'
-import { createProduct, getCategories } from '@/lib/supabase/queries'
+import { getCategories } from '@/lib/supabase/queries'
 import { useRouter } from 'next/navigation'
+import { compressImageFile, fileToDataUrl } from '@/lib/utils'
 
 interface Category {
   id: string
@@ -37,6 +37,7 @@ export default function CreateProductPage() {
   })
 
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const router = useRouter()
@@ -68,39 +69,43 @@ export default function CreateProductPage() {
     }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      // Limit to 5 images
       const filesToProcess = Array.from(files).slice(0, 5)
-      setUploadedImages([]) // Clear previous images
+      setUploadedImages([])
+      setUploadedFiles([])
 
-      filesToProcess.forEach((file) => {
-        // Validate file type
+      for (const file of filesToProcess) {
         if (!file.type.startsWith('image/')) {
           alert('Solo se permiten archivos de imagen')
-          return
+          continue
         }
 
-        // Validate file size (max 5MB per image)
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Cada imagen debe ser menor a 5MB')
-          return
-        }
-
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            setUploadedImages((prev) => [...prev, event.target!.result as string])
+        let processedFile: File | Blob = file
+        try {
+          if (file.size > 4 * 1024 * 1024) {
+            processedFile = await compressImageFile(file)
           }
+
+          if (processedFile.size > 15 * 1024 * 1024) {
+            alert('La imagen debe ser menor a 15MB después de la compresión')
+            continue
+          }
+
+          const dataUrl = await fileToDataUrl(processedFile)
+          setUploadedImages((prev) => [...prev, dataUrl])
+          setUploadedFiles((prev) => [...prev, processedFile as File])
+        } catch (error) {
+          alert('No se pudo procesar la imagen. Intenta con otra imagen')
         }
-        reader.readAsDataURL(file)
-      })
+      }
     }
   }
 
   const removeImage = (index: number) => {
     setUploadedImages((prev) => prev.filter((_, i) => i !== index))
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,7 +138,7 @@ export default function CreateProductPage() {
         alert('Debes ingresar un precio válido o marcar como donación')
         return
       }
-      if (uploadedImages.length === 0) {
+      if (uploadedFiles.length === 0) {
         alert('Debes subir al menos una imagen')
         return
       }
@@ -145,19 +150,29 @@ export default function CreateProductPage() {
         return
       }
 
-      const productData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        price: formData.isDonation ? null : parseFloat(formData.price),
-        condition: formData.condition,
-        location: formData.location.trim(),
-        images: uploadedImages,
-        category_id: categoryId,
-        is_donation: formData.isDonation,
+      const formPayload = new FormData()
+      formPayload.append('title', formData.title.trim())
+      formPayload.append('description', formData.description.trim())
+      formPayload.append('category', categoryId)
+      formPayload.append('condition', formData.condition)
+      formPayload.append('location', formData.location.trim())
+      formPayload.append('price', formData.isDonation ? '' : formData.price)
+      formPayload.append('isDonation', formData.isDonation ? 'true' : 'false')
+
+      uploadedFiles.forEach((file) => {
+        formPayload.append('images', file)
+      })
+
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        body: formPayload,
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || 'Error al subir el producto')
       }
 
-      console.log('Creating product with data:', productData)
-      await createProduct(productData)
       alert('¡Producto publicado exitosamente!')
       router.push('/dashboard')
     } catch (error) {

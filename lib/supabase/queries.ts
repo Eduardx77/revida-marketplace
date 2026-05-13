@@ -1,5 +1,24 @@
 import { createClient } from './client'
 
+// Helper para asegurar que las URLs de Supabase sean absolutas
+function ensureAbsoluteUrl(url: string, supabaseUrl?: string): string {
+  if (!url) return url
+  
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  if (url.startsWith('/')) {
+    // URL relativa - construir URL absoluta
+    const baseUrl = supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!baseUrl) return url
+    
+    return baseUrl.replace(/\/$/, '') + url
+  }
+  
+  return url
+}
+
 // Products
 export async function getProducts(filters?: {
   category?: string
@@ -126,7 +145,7 @@ export async function createProduct(productData: {
   price?: number | null
   condition: string
   location: string
-  images: string[]
+  images: Array<string | File | Blob>
   category_id: string
   is_donation: boolean
 }) {
@@ -138,45 +157,74 @@ export async function createProduct(productData: {
     throw new Error('User not authenticated')
   }
 
+  const storageBucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'products'
+
   // Upload images to Supabase Storage
   const uploadedImageUrls: string[] = []
-  for (const imageBase64 of productData.images) {
+  for (const imageItem of productData.images) {
     try {
-      // Convert base64 to blob
-      const base64Data = imageBase64.split(',')[1] // Remove data:image/jpeg;base64, prefix
-      const byteCharacters = atob(base64Data)
-      const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      let blob: Blob
+      let extension = '.jpg'
+      let mimeType = 'image/jpeg'
+
+      if (typeof imageItem === 'string') {
+        if (imageItem.startsWith('data:')) {
+          const [meta, base64] = imageItem.split(',')
+          const mimeMatch = meta.match(/data:(.*?);base64/)
+          mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+          extension = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg'
+
+          const byteCharacters = atob(base64)
+          const byteNumbers = new Uint8Array(byteCharacters.length)
+          for (let i = 0; i < byteCharacters.length; i += 1) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i)
+          }
+          blob = new Blob([byteNumbers], { type: mimeType })
+        } else if (imageItem.startsWith('http')) {
+          uploadedImageUrls.push(imageItem)
+          continue
+        } else {
+          throw new Error('Formato de imagen no soportado')
+        }
+      } else {
+        blob = imageItem as Blob
+        mimeType = blob.type || 'image/jpeg'
+        extension = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg'
       }
-      const byteArray = new Uint8Array(byteNumbers)
-      const blob = new Blob([byteArray], { type: 'image/jpeg' })
 
-      // Generate unique filename
-      const fileName = `product-${user.id}-${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`
+      const fileName = `product-${user.id}-${Date.now()}-${Math.random().toString(36).substring(2)}${extension}`
 
-      // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('products')
+        .from(storageBucket)
         .upload(fileName, blob, {
-          contentType: 'image/jpeg',
-          upsert: false
+          contentType: mimeType,
+          upsert: false,
         })
 
       if (uploadError) {
-        console.error('Error uploading image:', uploadError)
+        console.error(`Error uploading image to bucket ${storageBucket}:`, uploadError)
         throw uploadError
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('products')
+      const publicUrlResponse = supabase.storage
+        .from(storageBucket)
         .getPublicUrl(fileName)
 
+      let publicUrl = publicUrlResponse.data?.publicUrl
+      
+      if (!publicUrl) {
+        console.error('Failed to generate public URL for file:', fileName)
+        throw new Error('No se pudo generar URL pública para la imagen')
+      }
+
+      // Asegurar que la URL sea absoluta
+      publicUrl = ensureAbsoluteUrl(publicUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)
+      
       uploadedImageUrls.push(publicUrl)
+      console.log('✅ Image uploaded with URL:', publicUrl)
     } catch (error) {
       console.error('Error processing image:', error)
-      throw new Error('Error al subir imagen')
+      throw new Error(`Error al subir imagen${storageBucket ? ` al bucket ${storageBucket}` : ''}`)
     }
   }
 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { compressImageFile, fileToDataUrl } from '@/lib/utils'
 
 const CATEGORIES = [
   'Muebles',
@@ -56,18 +57,30 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            setUploadedImages((prev) => [...prev, event.target!.result as string])
-          }
+      const filesToProcess = Array.from(files).slice(0, 5 - uploadedImages.length)
+
+      for (const file of filesToProcess) {
+        if (!file.type.startsWith('image/')) {
+          alert('Solo se permiten archivos de imagen')
+          continue
         }
-        reader.readAsDataURL(file)
-      })
+
+        try {
+          const processedFile = file.size > 4 * 1024 * 1024 ? await compressImageFile(file) : file
+          if (processedFile.size > 15 * 1024 * 1024) {
+            alert('La imagen debe ser menor a 15MB después de la compresión')
+            continue
+          }
+
+          const dataUrl = await fileToDataUrl(processedFile)
+          setUploadedImages((prev) => [...prev, dataUrl])
+        } catch (error) {
+          alert('No se pudo procesar la imagen. Intenta con una imagen más ligera')
+        }
+      }
     }
   }
 

@@ -1,193 +1,171 @@
-'use client'
-
-import { useState } from 'react'
 import Link from 'next/link'
-import { Heart, MapPin, User, MessageCircle, Share2, ChevronLeft } from 'lucide-react'
+import { MapPin, MessageCircle, Share2, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ProductImage } from '@/components/product-image'
 
-// Mock data for product detail
-const PRODUCT_DETAIL = {
-  id: '1',
-  title: 'Silla de Madera Rústica',
-  price: 45000,
-  condition: 'buen_estado',
-  location: 'CDMX, México',
-  description: 'Hermosa silla de madera maciza en excelente estado. Muy cómoda, perfecta para comedor o sala de estar. Tiene pequeñas marcas naturales de uso pero está estructuralmente perfecta.',
-  images: [
-    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1567538096051-b6c36370b63e?w=600&h=600&fit=crop',
-  ],
-  category: 'Muebles',
-  seller: {
-    id: '1',
-    name: 'Juan García',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan',
-    rating: 4.8,
-    reviews: 12,
-    responseTime: 'Responde en 2 horas',
-  },
-  isDonation: false,
-  views: 234,
-  postedAt: 'Hace 3 días',
-  tags: ['Madera', 'Rústico', 'Vintage', 'Segunda Mano'],
+export async function generateStaticParams() {
+  return []
 }
 
-export default function ProductDetailPage() {
-  const [mainImage, setMainImage] = useState(PRODUCT_DETAIL.images[0])
-  const [isFavorite, setIsFavorite] = useState(false)
+interface Props {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export default async function ProductDetailPage(props: Props) {
+  const params = await props.params
+  const productId = params.id
+  
+  console.log('🔍 ProductDetailPage - Loading ID:', productId)
+
+  // Usar URL del servidor para obtener el producto
+  const baseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000'
+
+  let product: any = null
+  let error: string | null = null
+
+  try {
+    console.log('🌐 Fetching from:', `${baseUrl}/api/products/${productId}`)
+    
+    const response = await fetch(`${baseUrl}/api/products/${productId}`, {
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    console.log('📊 Response status:', response.status)
+
+    if (!response.ok) {
+      error = 'Producto no encontrado'
+    } else {
+      product = await response.json()
+      console.log('✅ Product loaded:', product?.title, '(ID:', product?.id, ')')
+    }
+  } catch (err) {
+    console.error('❌ Error loading product:', err)
+    error = 'No se pudo cargar el producto'
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
       <div className="container mx-auto px-4 py-6">
-        {/* Back Button */}
         <Link href="/marketplace" className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 mb-6">
           <ChevronLeft size={20} />
           Volver al marketplace
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-white rounded-xl p-6 shadow-lg">
-          {/* Images Section */}
-          <div className="space-y-4">
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square">
-              <img src={mainImage} alt={PRODUCT_DETAIL.title} className="w-full h-full object-cover" />
-              <button
-                onClick={() => setIsFavorite(!isFavorite)}
-                className="absolute top-4 right-4 p-3 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors"
-              >
-                <Heart
-                  size={24}
-                  className={isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400'}
-                />
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {PRODUCT_DETAIL.images.map((image, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setMainImage(image)}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                    mainImage === image ? 'border-green-600' : 'border-gray-300'
-                  }`}
-                >
-                  <img src={image} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+            {error}
           </div>
+        )}
 
-          {/* Details Section */}
-          <div className="space-y-6">
-            {/* Header */}
-            <div>
-              <div className="flex items-start justify-between mb-3">
+        {product && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-white rounded-xl p-6 shadow-lg">
+              {/* Images */}
+              <div className="space-y-4">
+                {product.images && product.images.length > 0 && (
+                  <>
+                    <div className="bg-gray-100 rounded-lg overflow-hidden aspect-square">
+                      <ProductImage 
+                        src={product.images[0]} 
+                        alt={product.title}
+                        className="w-full h-full object-cover"
+                        priority
+                      />
+                    </div>
+                    {product.images.length > 1 && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {product.images.map((img: string, idx: number) => (
+                          <ProductImage
+                            key={idx}
+                            src={img}
+                            alt={`View ${idx + 1}`}
+                            className="w-full h-full object-cover rounded border border-gray-300"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="space-y-6">
                 <div>
-                  <div className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium mb-3">
-                    {PRODUCT_DETAIL.category}
+                  {product.categories?.name && (
+                    <div className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium mb-3">
+                      {product.categories.name}
+                    </div>
+                  )}
+                  <h1 className="text-3xl font-bold text-green-900 mb-2">{product.title}</h1>
+                </div>
+
+                <div className="flex items-center gap-2 text-gray-600 mb-4">
+                  <MapPin size={18} className="text-green-600" />
+                  {product.location}
+                </div>
+
+                <div className="border-t border-b py-4">
+                  {product.price && product.price > 0 ? (
+                    <p className="text-4xl font-bold text-green-600">${product.price.toLocaleString()}</p>
+                  ) : (
+                    <p className="text-2xl font-bold text-green-700 bg-green-100 inline-block px-4 py-2 rounded">Donación</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-2 capitalize">
+                    Condición: {product.condition?.replace('_', ' ')}
+                  </p>
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-bold text-green-900 mb-3">Descripción</h2>
+                  <p className="text-gray-700 leading-relaxed">{product.description}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white h-12 rounded-lg font-bold text-lg">
+                    <MessageCircle size={20} className="mr-2" />
+                    Enviar Mensaje
+                  </Button>
+                  <Button variant="outline" className="w-full border-2 border-green-300 h-12 rounded-lg font-bold">
+                    <Share2 size={18} className="mr-2" />
+                    Compartir
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {product.profiles && (
+              <div className="mt-8 bg-white rounded-xl p-6 shadow-lg">
+                <h2 className="text-xl font-bold text-green-900 mb-4">Sobre el vendedor</h2>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    {product.profiles.avatar_url && (
+                      <ProductImage
+                        src={product.profiles.avatar_url}
+                        alt={product.profiles.full_name}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                    )}
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">{product.profiles.full_name}</h3>
+                      <p className="text-sm text-gray-500">{product.profiles.location || 'Sin ubicación'}</p>
+                    </div>
                   </div>
-                  <h1 className="text-3xl font-bold text-green-900 mb-2">{PRODUCT_DETAIL.title}</h1>
+                  <Button className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
+                    <MessageCircle size={18} className="mr-2" />
+                    Contactar
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-600 mb-4">
-                <MapPin size={18} className="text-green-600" />
-                {PRODUCT_DETAIL.location}
-              </div>
-              <div className="text-gray-500 text-sm">{PRODUCT_DETAIL.postedAt}</div>
-            </div>
-
-            {/* Price */}
-            <div className="border-t border-b py-4">
-              {PRODUCT_DETAIL.price > 0 ? (
-                <p className="text-4xl font-bold text-green-600">${PRODUCT_DETAIL.price.toLocaleString()}</p>
-              ) : (
-                <p className="text-2xl font-bold text-green-700 bg-green-100 inline-block px-4 py-2 rounded">Donación</p>
-              )}
-              <p className="text-sm text-gray-600 mt-2 capitalize">
-                Condición: {PRODUCT_DETAIL.condition.replace('_', ' ')}
-              </p>
-            </div>
-
-            {/* Description */}
-            <div>
-              <h2 className="text-lg font-bold text-green-900 mb-3">Descripción</h2>
-              <p className="text-gray-700 leading-relaxed">{PRODUCT_DETAIL.description}</p>
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2">
-              {PRODUCT_DETAIL.tags.map((tag, idx) => (
-                <span
-                  key={idx}
-                  className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button className="w-full bg-green-600 hover:bg-green-700 text-white h-12 rounded-lg font-bold text-lg">
-                <MessageCircle size={20} className="mr-2" />
-                Enviar Mensaje
-              </Button>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-2 border-green-300 h-12 rounded-lg font-bold"
-                >
-                  <Share2 size={18} className="mr-2" />
-                  Compartir
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Seller Section */}
-        <div className="mt-8 bg-white rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-bold text-green-900 mb-4">Sobre el vendedor</h2>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src={PRODUCT_DETAIL.seller.avatar}
-                alt={PRODUCT_DETAIL.seller.name}
-                className="w-16 h-16 rounded-full"
-              />
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{PRODUCT_DETAIL.seller.name}</h3>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-yellow-500">★</span>
-                  {PRODUCT_DETAIL.seller.rating} ({PRODUCT_DETAIL.seller.reviews} reseñas)
-                </div>
-                <p className="text-sm text-gray-500">{PRODUCT_DETAIL.seller.responseTime}</p>
-              </div>
-            </div>
-            <Button className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
-              <MessageCircle size={18} className="mr-2" />
-              Contactar
-            </Button>
-          </div>
-        </div>
-
-        {/* Similar Products Section */}
-        <div className="mt-8 mb-8">
-          <h2 className="text-2xl font-bold text-green-900 mb-6">Productos similares</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <Link
-                key={i}
-                href={`/products/${i}`}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all overflow-hidden"
-              >
-                <div className="h-40 bg-gray-100"></div>
-                <div className="p-4">
-                  <p className="font-bold text-green-900">Producto similar {i}</p>
-                  <p className="text-green-600 font-bold">$25000</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+            )}
+          </>
+        )}
       </div>
     </main>
   )

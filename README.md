@@ -21,7 +21,8 @@ Un marketplace para productos reutilizados y donaciones, construido con Next.js,
      ```
      NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
      NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_aqui
-     NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
+     SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
+     NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=products
      ```
 
 4. **Deploy:**

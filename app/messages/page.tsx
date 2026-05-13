@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Send, Search, MessageCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ProductImage } from '@/components/product-image'
 import { createClient } from '@/lib/supabase/client'
 import { getUserConversations, sendMessage, formatTime } from '@/lib/supabase/queries'
 
@@ -143,7 +144,7 @@ export default function MessagesPage() {
                     }`}
                   >
                     <div className="flex gap-3">
-                      <img
+                      <ProductImage
                         src={conversation.userAvatar}
                         alt={conversation.userName}
                         className="w-12 h-12 rounded-full"
@@ -183,7 +184,7 @@ export default function MessagesPage() {
             <div className="hidden md:flex flex-1 flex-col">
               {/* Header */}
               <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                <img
+                <ProductImage
                   src={selectedConversation.userAvatar}
                   alt={selectedConversation.userName}
                   className="w-10 h-10 rounded-full"
@@ -209,8 +210,8 @@ export default function MessagesPage() {
                       message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'
                     }`}
                   >
-                    {message.senderId !== currentUser?.id && (
-                      <img
+                    {message.senderId !== currentUser?.id && message.senderAvatar && (
+                      <ProductImage
                         src={message.senderAvatar}
                         alt={message.senderName}
                         className="w-8 h-8 rounded-full"

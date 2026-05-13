@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Heart, Settings, LogOut, User, Package, MessageSquare, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ProductImage } from '@/components/product-image'
 import { createClient } from '@/lib/supabase/client'
 import { getUserProducts, getUserFavorites } from '@/lib/supabase/queries'
 
@@ -166,7 +167,7 @@ export default function DashboardPage() {
                 {userProducts.length > 0 ? (
                   userProducts.map((product) => (
                     <div key={product.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <img
+                      <ProductImage
                         src={product.images?.[0] || 'https://via.placeholder.com/80x80?text=No+Image'}
                         alt={product.title}
                         className="w-20 h-20 rounded-lg object-cover"
@@ -196,7 +197,7 @@ export default function DashboardPage() {
                       key={product.id}
                       className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
                     >
-                      <img
+                      <ProductImage
                         src={product.image}
                         alt={product.title}
                         className="w-20 h-20 rounded-lg object-cover"
