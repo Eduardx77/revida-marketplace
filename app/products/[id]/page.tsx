@@ -11,33 +11,34 @@ interface Props {
 }
 
 export default async function ProductDetailPage({ params }: Props) {
-  const productId = Array.isArray(params.id) ? params.id[0] : params.id
-  const invalidId = !productId || productId === 'undefined' || productId === 'null'
+  const rawId = params?.id
+  const productId = typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : undefined
+  const normalizedProductId = productId && productId !== 'undefined' && productId !== 'null' ? productId : undefined
 
-  console.log('🔍 ProductDetailPage - Loading ID:', productId)
+  console.log('🔍 ProductDetailPage - Loading ID:', normalizedProductId)
 
-  if (invalidId) {
-    console.error('❌ Product detail page missing or invalid id parameter:', params.id)
-    return <ProductLoadErrorPage productId={String(params.id)} message="ID de producto inválido." />
+  if (!normalizedProductId) {
+    console.error('❌ Product detail page missing or invalid id parameter:', rawId)
+    return <ProductLoadErrorPage productId={String(rawId ?? 'desconocido')} message="ID de producto inválido." />
   }
 
   let product: any = null
 
   try {
-    product = await getProduct(productId)
+    product = await getProduct(normalizedProductId)
     product = JSON.parse(JSON.stringify(product))
     console.log('✅ Product loaded:', product?.title, '(ID:', product?.id, ')')
   } catch (err) {
     console.error('❌ Error loading product:', err)
-    return <ProductLoadErrorPage productId={productId} message="No se pudo cargar este producto en este momento." />
+    return <ProductLoadErrorPage productId={normalizedProductId} message="No se pudo cargar este producto en este momento." />
   }
 
   if (!product || typeof product !== 'object') {
-    console.error('❌ Product detail page received invalid product payload for ID:', productId, product)
-    return <ProductLoadErrorPage productId={productId} message="No se encontró información válida para este producto." />
+    console.error('❌ Product detail page received invalid product payload for ID:', normalizedProductId, product)
+    return <ProductLoadErrorPage productId={normalizedProductId} message="No se encontró información válida para este producto." />
   }
 
-  return <ProductPageContent product={product} productId={productId} />
+  return <ProductPageContent product={product} productId={normalizedProductId} />
 }
 
 function ProductLoadErrorPage({ productId, message }: { productId: string; message: string }) {
@@ -47,7 +48,7 @@ function ProductLoadErrorPage({ productId, message }: { productId: string; messa
         <div className="rounded-3xl bg-white p-10 shadow-xl border border-red-100 text-center">
           <p className="text-sm uppercase tracking-[0.24em] text-red-600 font-semibold mb-4">Error al cargar producto</p>
           <h1 className="text-3xl font-bold text-green-900 mb-4">{message}</h1>
-          <p className="text-gray-600 mb-6">El producto con ID <span className="font-mono text-sm text-gray-800">{productId}</span> no se puede mostrar actualmente.</p>
+          <p className="text-gray-600 mb-6">El producto con ID <span className="font-mono text-sm text-gray-800">{productId || 'desconocido'}</span> no se puede mostrar actualmente.</p>
           <div className="flex justify-center gap-3">
             <a href="/marketplace" className="inline-flex items-center justify-center rounded-full bg-green-600 px-6 py-3 text-white font-semibold hover:bg-green-700 transition">
               Volver al marketplace
