@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       .getPublicUrl(fileName)
 
     if (!publicUrlData?.data?.publicUrl) {
-      console.error(`Error getting public URL for ${fileName}`, publicUrlData.error)
+      console.error(`Error getting public URL for ${fileName}`, publicUrlData)
       return new Response(JSON.stringify({ error: 'Error al obtener la URL de la imagen' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
