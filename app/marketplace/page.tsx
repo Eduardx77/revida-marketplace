@@ -66,7 +66,8 @@ export default function MarketplacePage() {
   const loadUser = async () => {
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const userResponse = await supabase.auth.getUser()
+      const user = userResponse.data?.user
       setCurrentUser(user)
     } catch (err) {
       console.error('Error loading user:', err)

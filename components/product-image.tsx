@@ -16,9 +16,8 @@ interface ImageProps {
  */
 export function ProductImage({ src, alt, className = '', priority = false, onError }: ImageProps) {
   const [hasError, setHasError] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
 
-  // Ensure URL is absolute
+  // Ensure URL is absolute and valid
   const absoluteUrl = ensureAbsoluteImageUrl(src)
 
   const handleError = () => {
@@ -27,11 +26,7 @@ export function ProductImage({ src, alt, className = '', priority = false, onErr
     onError?.()
   }
 
-  const handleLoad = () => {
-    setIsLoading(false)
-  }
-
-  if (hasError) {
+  if (!src || hasError) {
     return (
       <div className={`${className} bg-gray-100 flex items-center justify-center`}>
         <span className="text-gray-400 text-sm">Imagen no disponible</span>
@@ -46,8 +41,6 @@ export function ProductImage({ src, alt, className = '', priority = false, onErr
       className={className}
       loading={priority ? 'eager' : 'lazy'}
       onError={handleError}
-      onLoad={handleLoad}
-      crossOrigin="anonymous"
     />
   )
 }
@@ -57,23 +50,28 @@ export function ProductImage({ src, alt, className = '', priority = false, onErr
  * If relative, constructs absolute URL using Supabase URL
  */
 export function ensureAbsoluteImageUrl(url: string): string {
-  if (!url) return url
+  if (!url) return ''
 
-  // Already absolute
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url
+  const trimmedUrl = url.trim()
+  if (trimmedUrl.length === 0) return ''
+
+  if (/^(data:|blob:)/i.test(trimmedUrl)) {
+    return trimmedUrl
   }
 
-  // Relative URL - construct absolute URL
-  if (url.startsWith('/')) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    if (!supabaseUrl) {
-      console.warn('NEXT_PUBLIC_SUPABASE_URL not configured, cannot construct absolute URL')
-      return url
-    }
-
-    return supabaseUrl.replace(/\/$/, '') + url
+  if (/^https?:\/\//i.test(trimmedUrl)) {
+    return trimmedUrl
   }
 
-  return url
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '')
+  if (!supabaseUrl) {
+    console.warn('NEXT_PUBLIC_SUPABASE_URL not configured, using raw image path as fallback:', trimmedUrl)
+    return trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`
+  }
+
+  if (trimmedUrl.startsWith('/')) {
+    return `${supabaseUrl}${trimmedUrl}`
+  }
+
+  return `${supabaseUrl}/${trimmedUrl}`
 }

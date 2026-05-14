@@ -47,7 +47,9 @@ export default function MessagesPage() {
   const loadConversations = async () => {
     try {
       const supabase = createClient()
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      const userResponse = await supabase.auth.getUser()
+      const user = userResponse.data?.user
+      const userError = userResponse.error
 
       if (userError) {
         console.error('Auth error:', userError)

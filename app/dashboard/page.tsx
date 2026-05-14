@@ -118,7 +118,9 @@ export default function DashboardPage() {
     const supabase = createClient()
 
     const loadUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser()
+      const userResponse = await supabase.auth.getUser()
+      const user = userResponse.data?.user
+      const error = userResponse.error
       if (!error && user) {
         setCurrentUser(user)
 

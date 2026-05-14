@@ -141,7 +141,8 @@ export async function createProduct(productData: {
 }) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const userResponse = await supabase.auth.getUser()
+  const user = userResponse.data?.user
 
   if (!user) {
     throw new Error('User not authenticated')

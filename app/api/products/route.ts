@@ -1,12 +1,19 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'products'
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
 
 function parseBoolean(value: FormDataEntryValue | null): boolean {
   return value?.toString() === 'true'
+}
+
+function ensureAbsoluteUrl(url: string, supabaseUrl: string) {
+  if (!url) return url
+  if (/^https?:\/\//i.test(url)) return url
+  return `${supabaseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
 }
 
 export async function POST(request: Request) {
@@ -18,6 +25,8 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies()
+  let supabaseResponse = NextResponse.next()
+
   const authClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,10 +38,10 @@ export async function POST(request: Request) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              supabaseResponse.cookies.set(name, value, options),
             )
-          } catch {
-            // ignore when running in contexts where cookies cannot be updated
+          } catch (error) {
+            console.warn('[api/products] failed to set Supabase cookies', error)
           }
         },
       },
@@ -102,14 +111,16 @@ export async function POST(request: Request) {
       .getPublicUrl(fileName)
 
     if (!publicUrlData?.data?.publicUrl) {
-      console.error(`Error getting public URL for ${fileName}`)
+      console.error(`Error getting public URL for ${fileName}`, publicUrlData.error)
       return new Response(JSON.stringify({ error: 'Error al obtener la URL de la imagen' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    uploadedImageUrls.push(publicUrlData.data.publicUrl)
+    uploadedImageUrls.push(
+      ensureAbsoluteUrl(publicUrlData.data.publicUrl, process.env.NEXT_PUBLIC_SUPABASE_URL!)
+    )
   }
 
   const { data, error } = await authClient

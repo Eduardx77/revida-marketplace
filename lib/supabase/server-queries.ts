@@ -3,20 +3,17 @@ import { createClient } from './server'
 // Helper para asegurar que las URLs de Supabase sean absolutas
 function ensureAbsoluteUrl(url: string, supabaseUrl?: string): string {
   if (!url) return url
-  
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+
+  if (/^https?:\/\//i.test(url)) {
     return url
   }
-  
-  if (url.startsWith('/')) {
-    // URL relativa - construir URL absoluta
-    const baseUrl = supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL
-    if (!baseUrl) return url
-    
-    return baseUrl.replace(/\/$/, '') + url
+
+  const baseUrl = (supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL)?.replace(/\/$/, '')
+  if (!baseUrl) {
+    return url.startsWith('/') ? url : `/${url}`
   }
-  
-  return url
+
+  return url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`
 }
 
 export async function getProduct(id: string) {
