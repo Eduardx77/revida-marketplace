@@ -48,18 +48,11 @@ export default function MessagesPage() {
     try {
       const supabase = createClient()
       const userResponse = await supabase.auth.getUser()
-      const user = userResponse.data?.user
-      const userError = userResponse.error
-
-      if (userError) {
-        console.error('Auth error:', userError)
+      if (userResponse.error || !userResponse.data?.user) {
         return
       }
 
-      if (!user) {
-        console.log('No user found')
-        return
-      }
+      const user = userResponse.data.user
 
       console.log('User authenticated:', user.id)
       setCurrentUser(user)

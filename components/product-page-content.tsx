@@ -39,11 +39,12 @@ export default function ProductPageContent({ product, productId }: ProductPagePr
 
   useEffect(() => {
     const checkFavoriteStatus = async () => {
-      const supabase = createClient()
-      const userResponse = await supabase.auth.getUser()
-      const user = userResponse.data?.user
+      try {
+        const supabase = createClient()
+        const userResponse = await supabase.auth.getUser()
+        if (userResponse.error || !userResponse.data?.user) return
 
-      if (user) {
+        const user = userResponse.data.user
         setCurrentUser(user)
 
         const { data: favorites, error } = await supabase
@@ -56,12 +57,12 @@ export default function ProductPageContent({ product, productId }: ProductPagePr
         if (!error) {
           setIsFavorite(!!favorites)
         }
+      } catch {
+        // Ignorar errores de auth/ fetch para no romper la vista de producto.
       }
     }
 
-    checkFavoriteStatus().catch((error) => {
-      console.error('Error checking favorite status:', error)
-    })
+    checkFavoriteStatus()
   }, [productId])
 
   const handleToggleFavorite = async () => {

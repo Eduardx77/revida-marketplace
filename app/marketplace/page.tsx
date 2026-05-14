@@ -29,7 +29,6 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     loadCategories()
-    loadUser()
   }, [])
 
   useEffect(() => {
@@ -67,10 +66,11 @@ export default function MarketplacePage() {
     try {
       const supabase = createClient()
       const userResponse = await supabase.auth.getUser()
+      if (userResponse.error) return
       const user = userResponse.data?.user
       setCurrentUser(user)
-    } catch (err) {
-      console.error('Error loading user:', err)
+    } catch {
+      // Ignorar fallos de auth en el navegador para no romper la vista del marketplace.
     }
   }
 
@@ -162,60 +162,73 @@ export default function MarketplacePage() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products.map((product) => (
-                <Link
-                  key={product.id}
-                  href={`/products/${product.id}`}
-                  className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden hover:scale-105"
-                >
-                  <div className="relative h-48 bg-green-100 overflow-hidden">
-                    <ProductImage
-                      src={product.images?.[0] || 'https://via.placeholder.com/300x200?text=No+Image'}
-                      alt={product.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                    />
-                    <button
-                      onClick={async (e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        await handleToggleFavorite(product.id)
-                      }}
-                      className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors"
-                    >
-                      <Heart
-                        size={20}
-                        className={favorites.includes(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}
+              {products.map((product, index) => {
+                const productIdRaw = product?.id ?? product?.product_id
+                const productId = productIdRaw != null ? String(productIdRaw).trim() : ''
+                const invalidProductId =
+                  !productId ||
+                  ['undefined', 'null', 'desconocido'].includes(productId.toLowerCase())
+
+                if (invalidProductId) {
+                  console.warn('Marketplace render: product has invalid id, skipping product card', product)
+                  return null
+                }
+
+                return (
+                  <Link
+                    key={productId}
+                    href={`/products/${productId}`}
+                    className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden hover:scale-105"
+                  >
+                    <div className="relative h-48 bg-green-100 overflow-hidden">
+                      <ProductImage
+                        src={product.images?.[0] || 'https://via.placeholder.com/300x200?text=No+Image'}
+                        alt={product.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                       />
-                    </button>
-                    {product.is_donation && (
-                      <div className="absolute top-3 left-3 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        Donación
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-bold text-green-900 mb-2 line-clamp-2">{product.title}</h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                      <MapPin size={16} className="text-green-600" />
-                      {product.location}
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          await handleToggleFavorite(product.id)
+                        }}
+                        className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors"
+                      >
+                        <Heart
+                          size={20}
+                          className={favorites.includes(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}
+                        />
+                      </button>
+                      {product.is_donation && (
+                        <div className="absolute top-3 left-3 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                          Donación
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        {product.price > 0 ? (
-                          <p className="text-2xl font-bold text-green-600">${product.price.toLocaleString()}</p>
-                        ) : (
-                          <p className="text-sm font-medium text-green-700 bg-green-100 px-2 py-1 rounded">Gratis</p>
-                        )}
-                        <p className="text-xs text-gray-500 mt-1">{product.condition}</p>
+                    <div className="p-4">
+                      <h3 className="font-bold text-green-900 mb-2 line-clamp-2">{product.title}</h3>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                        <MapPin size={16} className="text-green-600" />
+                        {product.location}
                       </div>
-                      <div className="flex items-center gap-1 text-gray-600 text-sm">
-                        <Package size={14} />
-                        {product.views_count ?? product.views}
+                      <div className="flex justify-between items-end">
+                        <div>
+                          {product.price > 0 ? (
+                            <p className="text-2xl font-bold text-green-600">${product.price.toLocaleString()}</p>
+                          ) : (
+                            <p className="text-sm font-medium text-green-700 bg-green-100 px-2 py-1 rounded">Gratis</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">{product.condition}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-600 text-sm">
+                          <Package size={14} />
+                          {product.views_count ?? product.views}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              })}
             </div>
 
             {products.length === 0 && (

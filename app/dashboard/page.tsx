@@ -118,10 +118,14 @@ export default function DashboardPage() {
     const supabase = createClient()
 
     const loadUser = async () => {
-      const userResponse = await supabase.auth.getUser()
-      const user = userResponse.data?.user
-      const error = userResponse.error
-      if (!error && user) {
+      try {
+        const userResponse = await supabase.auth.getUser()
+        if (userResponse.error || !userResponse.data?.user) {
+          setLoading(false)
+          return
+        }
+
+        const user = userResponse.data.user
         setCurrentUser(user)
 
         // Load user profile
@@ -136,8 +140,11 @@ export default function DashboardPage() {
         }
 
         await loadUserData(user.id)
+      } catch (error) {
+        console.warn('Error fetching current user in dashboard:', error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     loadUser()
@@ -156,6 +163,65 @@ export default function DashboardPage() {
       setUserProducts([])
       setFavorites([])
     }
+  }
+
+  const renderPublishedProduct = (product: any) => {
+    const productIdRaw = product?.id ?? product?.product_id
+    const productId = productIdRaw != null ? String(productIdRaw).trim() : ''
+    const invalidProductId = !productId || ['undefined', 'null', 'desconocido'].includes(productId.toLowerCase())
+
+    if (invalidProductId) {
+      console.warn('Dashboard render: product has invalid id, skipping product card', product)
+      return null
+    }
+
+    return (
+      <div key={productId} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+        <ProductImage
+          src={product.images?.[0] || 'https://via.placeholder.com/80x80?text=No+Image'}
+          alt={product.title}
+          className="w-20 h-20 rounded-lg object-cover"
+        />
+        <div className="flex-1">
+          <h3 className="font-bold text-gray-900">{product.title}</h3>
+          <p className="text-sm text-gray-600">${(product.price ?? 0).toLocaleString()} • {product.views_count ?? 0} vistas</p>
+          <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+            {product.is_available ? 'Activo' : 'No disponible'}
+          </span>
+          <div className="mt-3">
+            <Link href={`/products/${productId}`} className="text-green-700 font-semibold hover:text-green-900 underline">
+              Ver producto publicado
+            </Link>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 items-end">
+          <Link href={`/products/${productId}`}>
+            <Button variant="outline" size="sm">Ver producto</Button>
+          </Link>
+          <Link href={`/products/${productId}/edit`}>
+            <Button variant="outline" size="sm">Editar</Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600"
+            onClick={() => handleDeleteProduct(productId)}
+            disabled={actionLoading}
+          >
+            Eliminar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-white bg-emerald-600 hover:bg-emerald-700 border-transparent"
+            onClick={() => handleToggleAvailability(productId, product.is_available)}
+            disabled={actionLoading}
+          >
+            {product.is_available ? 'Marcar vendido' : 'Reactivar'}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -265,45 +331,7 @@ export default function DashboardPage() {
             {activeTab === 'products' && (
               <div className="space-y-4">
                 {userProducts.length > 0 ? (
-                  userProducts.map((product) => (
-                    <div key={product.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <ProductImage
-                        src={product.images?.[0] || 'https://via.placeholder.com/80x80?text=No+Image'}
-                        alt={product.title}
-                        className="w-20 h-20 rounded-lg object-cover"
-                      />
-                      <div className="flex-1">
-                        <h3 className="font-bold text-gray-900">{product.title}</h3>
-                        <p className="text-sm text-gray-600">${(product.price ?? 0).toLocaleString()} • {product.views_count ?? 0} vistas</p>
-                        <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                          {product.is_available ? 'Activo' : 'No disponible'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-2 items-end">
-                        <Link href={`/products/${product.id}/edit`}>
-                          <Button variant="outline" size="sm">Editar</Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600"
-                          onClick={() => handleDeleteProduct(product.id)}
-                          disabled={actionLoading}
-                        >
-                          Eliminar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-white bg-emerald-600 hover:bg-emerald-700 border-transparent"
-                          onClick={() => handleToggleAvailability(product.id, product.is_available)}
-                          disabled={actionLoading}
-                        >
-                          {product.is_available ? 'Marcar vendido' : 'Reactivar'}
-                        </Button>
-                      </div>
-                    </div>
-                  ))
+                  userProducts.map(renderPublishedProduct)
                 ) : (
                   <p className="text-center text-gray-600 py-8">No tienes productos publicados</p>
                 )}
