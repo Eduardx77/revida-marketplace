@@ -234,8 +234,14 @@ export default function MessagesPage() {
               {/* Input */}
               <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
                 <div className="flex gap-2">
+                  <label htmlFor="message-input" className="sr-only">
+                    Escribe tu mensaje
+                  </label>
                   <Input
+                    id="message-input"
+                    name="message"
                     type="text"
+                    autoComplete="off"
                     placeholder="Escribe tu mensaje..."
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}

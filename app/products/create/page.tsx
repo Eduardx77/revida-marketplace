@@ -202,12 +202,13 @@ export default function CreateProductPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Título */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-title" className="block text-sm font-bold text-gray-900 mb-2">
                 Título del Producto *
               </label>
               <Input
-                type="text"
+                id="product-title"
                 name="title"
+                type="text"
                 value={formData.title}
                 onChange={handleInputChange}
                 placeholder="Ej: Silla de madera rústica"
@@ -218,10 +219,11 @@ export default function CreateProductPage() {
 
             {/* Descripción */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-description" className="block text-sm font-bold text-gray-900 mb-2">
                 Descripción *
               </label>
               <textarea
+                id="product-description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -235,10 +237,11 @@ export default function CreateProductPage() {
             {/* Categoría y Condición */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-2">
+                <label htmlFor="product-category" className="block text-sm font-bold text-gray-900 mb-2">
                   Categoría *
                 </label>
                 <select
+                  id="product-category"
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
@@ -257,10 +260,11 @@ export default function CreateProductPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-2">
+                <label htmlFor="product-condition" className="block text-sm font-bold text-gray-900 mb-2">
                   Condición *
                 </label>
                 <select
+                  id="product-condition"
                   name="condition"
                   value={formData.condition}
                   onChange={handleInputChange}
@@ -280,11 +284,12 @@ export default function CreateProductPage() {
             {/* Precio */}
             <div>
               <div className="flex items-center gap-4 mb-3">
-                <label className="block text-sm font-bold text-gray-900">
+                <label htmlFor="product-price" className="block text-sm font-bold text-gray-900">
                   Precio
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label htmlFor="donation-checkbox" className="flex items-center gap-2 cursor-pointer">
                   <input
+                    id="donation-checkbox"
                     type="checkbox"
                     name="isDonation"
                     checked={formData.isDonation}
@@ -296,8 +301,9 @@ export default function CreateProductPage() {
               </div>
               {!formData.isDonation && (
                 <Input
-                  type="number"
+                  id="product-price"
                   name="price"
+                  type="number"
                   value={formData.price}
                   onChange={handleInputChange}
                   placeholder="Ej: 45000"
@@ -308,12 +314,13 @@ export default function CreateProductPage() {
 
             {/* Ubicación */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-location" className="block text-sm font-bold text-gray-900 mb-2">
                 Ubicación *
               </label>
               <Input
-                type="text"
+                id="product-location"
                 name="location"
+                type="text"
                 value={formData.location}
                 onChange={handleInputChange}
                 placeholder="Ej: CDMX, México"
@@ -329,12 +336,13 @@ export default function CreateProductPage() {
               </label>
               <div className="border-2 border-dashed border-green-300 rounded-lg p-8 text-center hover:border-green-600 transition-colors">
                 <input
+                  id="image-upload"
+                  name="images"
                   type="file"
                   multiple
                   accept="image/*"
                   onChange={handleImageUpload}
                   className="hidden"
-                  id="image-upload"
                 />
                 <label
                   htmlFor="image-upload"

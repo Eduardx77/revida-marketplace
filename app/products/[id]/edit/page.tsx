@@ -1,23 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Upload, X } from 'lucide-react'
+import { ChevronLeft, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { compressImageFile, fileToDataUrl } from '@/lib/utils'
+import { getCategories } from '@/lib/supabase/queries'
 
-const CATEGORIES = [
-  'Muebles',
-  'Electrónica',
-  'Ropa',
-  'Hogar',
-  'Deportes',
-  'Libros',
-  'Juguetes',
-  'Jardín',
-  'Vehículos',
-  'Otros',
+const FALLBACK_CATEGORIES = [
+  { name: 'Muebles', slug: 'muebles' },
+  { name: 'Electrónica', slug: 'electronica' },
+  { name: 'Ropa', slug: 'ropa' },
+  { name: 'Hogar', slug: 'hogar' },
+  { name: 'Deportes', slug: 'deportes' },
+  { name: 'Libros', slug: 'libros' },
+  { name: 'Juguetes', slug: 'juguetes' },
+  { name: 'Jardín', slug: 'jardin' },
+  { name: 'Vehículos', slug: 'vehiculos' },
+  { name: 'Otros', slug: 'otros' },
 ]
 
 const CONDITIONS = [
@@ -28,22 +29,62 @@ const CONDITIONS = [
   { value: 'para_reparar', label: 'Para reparar' },
 ]
 
-// Mock data - en producción vendría de la API
-const MOCK_PRODUCT = {
-  id: '1',
-  title: 'Silla de Madera Rústica',
-  description: 'Hermosa silla de madera maciza en excelente estado',
-  category: 'Muebles',
-  condition: 'buen_estado',
-  price: '45000',
-  location: 'CDMX',
-  isDonation: false,
-  images: ['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&h=300&fit=crop'],
-}
+export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter()
+  const [productId, setProductId] = useState<string>('')
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category_id: '',
+    condition: '',
+    price: '',
+    location: '',
+    isDonation: false,
+  })
+  const [images, setImages] = useState<string[]>([])
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
-export default function EditProductPage({ params }: { params: { id: string } }) {
-  const [formData, setFormData] = useState(MOCK_PRODUCT)
-  const [uploadedImages, setUploadedImages] = useState<string[]>(MOCK_PRODUCT.images)
+  useEffect(() => {
+    const loadData = async () => {
+      const { id } = await params
+      setProductId(id)
+      setLoading(true)
+      try {
+        const [categoriesData, productRes] = await Promise.all([
+          getCategories(),
+          fetch(`/api/products/${id}`),
+        ])
+
+        if (!productRes.ok) {
+          throw new Error('No se pudo cargar el producto')
+        }
+
+        const productData = await productRes.json()
+        setCategories(Array.isArray(categoriesData) && categoriesData.length > 0 ? categoriesData : FALLBACK_CATEGORIES)
+
+        setFormData({
+          title: productData.title || '',
+          description: productData.description || '',
+          category_id: productData.category_id || '',
+          condition: productData.condition || '',
+          price: productData.price ? String(productData.price) : '',
+          location: productData.location || '',
+          isDonation: Boolean(productData.is_donation),
+        })
+        setImages(Array.isArray(productData.images) ? productData.images : [])
+      } catch (error) {
+        console.error('Error cargando producto para editar:', error)
+        setErrorMessage('No se pudo cargar la información del producto.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -57,41 +98,61 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     }))
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const filesToProcess = Array.from(files).slice(0, 5 - uploadedImages.length)
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index))
+  }
 
-      for (const file of filesToProcess) {
-        if (!file.type.startsWith('image/')) {
-          alert('Solo se permiten archivos de imagen')
-          continue
-        }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setErrorMessage('')
 
-        try {
-          const processedFile = file.size > 4 * 1024 * 1024 ? await compressImageFile(file) : file
-          if (processedFile.size > 15 * 1024 * 1024) {
-            alert('La imagen debe ser menor a 15MB después de la compresión')
-            continue
-          }
-
-          const dataUrl = await fileToDataUrl(processedFile)
-          setUploadedImages((prev) => [...prev, dataUrl])
-        } catch (error) {
-          alert('No se pudo procesar la imagen. Intenta con una imagen más ligera')
-        }
+    try {
+      const payload: any = {
+        title: formData.title,
+        description: formData.description,
+        category_id: formData.category_id,
+        condition: formData.condition,
+        location: formData.location,
+        is_donation: formData.isDonation,
+        images,
       }
+
+      if (!formData.isDonation) {
+        payload.price = Number(formData.price)
+      }
+
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || 'No se pudo actualizar el producto.')
+      }
+
+      router.push(`/products/${productId}`)
+    } catch (error) {
+      console.error('Error actualizando el producto:', error)
+      setErrorMessage('Hubo un problema al guardar los cambios. Intenta de nuevo.')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const removeImage = (index: number) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('Producto actualizado:', { ...formData, images: uploadedImages })
-    alert('¡Producto actualizado exitosamente!')
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
+        <div className="container mx-auto px-4 py-16 max-w-2xl text-center text-green-700">
+          Cargando producto...
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -99,7 +160,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         {/* Back Button */}
         <Link
-          href={`/products/${params.id}`}
+          href={`/products/${productId}`}
           className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 mb-6"
         >
           <ChevronLeft size={20} />
@@ -109,16 +170,22 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-green-900 mb-2">Editar Producto</h1>
           <p className="text-green-700 mb-8">Actualiza la información de tu producto</p>
+          {errorMessage ? (
+            <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Título */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-title" className="block text-sm font-bold text-gray-900 mb-2">
                 Título del Producto *
               </label>
               <Input
-                type="text"
+                id="product-title"
                 name="title"
+                type="text"
                 value={formData.title}
                 onChange={handleInputChange}
                 placeholder="Ej: Silla de madera rústica"
@@ -129,10 +196,11 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
             {/* Descripción */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-description" className="block text-sm font-bold text-gray-900 mb-2">
                 Descripción *
               </label>
               <textarea
+                id="product-description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -146,29 +214,31 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             {/* Categoría y Condición */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-2">
+                <label htmlFor="product-category" className="block text-sm font-bold text-gray-900 mb-2">
                   Categoría *
                 </label>
                 <select
-                  name="category"
-                  value={formData.category}
+                  id="product-category"
+                  name="category_id"
+                  value={formData.category_id}
                   onChange={handleInputChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
                 >
                   <option value="">Seleccionar categoría</option>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <option key={cat.slug} value={cat.slug}>
+                      {cat.name}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-2">
+                <label htmlFor="product-condition" className="block text-sm font-bold text-gray-900 mb-2">
                   Condición *
                 </label>
                 <select
+                  id="product-condition"
                   name="condition"
                   value={formData.condition}
                   onChange={handleInputChange}
@@ -188,11 +258,12 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             {/* Precio */}
             <div>
               <div className="flex items-center gap-4 mb-3">
-                <label className="block text-sm font-bold text-gray-900">
+                <label htmlFor="product-price" className="block text-sm font-bold text-gray-900">
                   Precio
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label htmlFor="donation-checkbox" className="flex items-center gap-2 cursor-pointer">
                   <input
+                    id="donation-checkbox"
                     type="checkbox"
                     name="isDonation"
                     checked={formData.isDonation}
@@ -204,8 +275,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
               </div>
               {!formData.isDonation && (
                 <Input
-                  type="number"
+                  id="product-price"
                   name="price"
+                  type="number"
                   value={formData.price}
                   onChange={handleInputChange}
                   placeholder="Ej: 45000"
@@ -216,12 +288,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
             {/* Ubicación */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 mb-2">
+              <label htmlFor="product-location" className="block text-sm font-bold text-gray-900 mb-2">
                 Ubicación *
               </label>
               <Input
-                type="text"
+                id="product-location"
                 name="location"
+                type="text"
                 value={formData.location}
                 onChange={handleInputChange}
                 placeholder="Ej: CDMX, México"
@@ -230,41 +303,21 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
               />
             </div>
 
-            {/* Imágenes */}
             <div>
               <label className="block text-sm font-bold text-gray-900 mb-2">
                 Fotos del Producto
               </label>
-              <div className="border-2 border-dashed border-green-300 rounded-lg p-8 text-center hover:border-green-600 transition-colors">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label
-                  htmlFor="image-upload"
-                  className="flex flex-col items-center cursor-pointer"
-                >
-                  <Upload size={32} className="text-green-600 mb-2" />
-                  <p className="text-green-700 font-medium">Sube más imágenes aquí</p>
-                  <p className="text-gray-600 text-sm">o haz clic para seleccionar</p>
-                </label>
-              </div>
-
-              {/* Imágenes */}
-              {uploadedImages.length > 0 && (
+              {images.length > 0 ? (
                 <div className="grid grid-cols-3 gap-4 mt-4">
-                  {uploadedImages.map((image, idx) => (
+                  {images.map((image, idx) => (
                     <div key={idx} className="relative group">
                       <img
                         src={image}
-                        alt={`Uploaded ${idx}`}
+                        alt={`Imagen ${idx + 1}`}
                         className="w-full h-24 object-cover rounded-lg"
                       />
                       <button
+                        type="button"
                         onClick={() => removeImage(idx)}
                         className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >
@@ -273,6 +326,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-gray-600">No hay imágenes disponibles para este producto.</p>
               )}
             </div>
 
@@ -280,11 +335,12 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             <div className="flex gap-4 pt-6 border-t">
               <Button
                 type="submit"
+                disabled={saving}
                 className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12 font-bold text-lg rounded-lg"
               >
-                Guardar Cambios
+                {saving ? 'Guardando...' : 'Guardar Cambios'}
               </Button>
-              <Link href={`/products/${params.id}`} className="flex-1">
+              <Link href={`/products/${productId}`} className="flex-1">
                 <Button
                   type="button"
                   variant="outline"

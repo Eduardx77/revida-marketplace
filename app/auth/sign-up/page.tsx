@@ -110,7 +110,9 @@ export default function SignUpPage() {
                     <Label htmlFor="name">Nombre completo</Label>
                     <Input
                       id="name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       placeholder="Tu nombre"
                       required
                       value={name}
@@ -122,7 +124,9 @@ export default function SignUpPage() {
                     <Label htmlFor="email">Correo electrónico</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
+                      autoComplete="email"
                       placeholder="tu@email.com"
                       required
                       value={email}
@@ -134,7 +138,9 @@ export default function SignUpPage() {
                     <Label htmlFor="password">Contraseña</Label>
                     <Input
                       id="password"
+                      name="password"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -145,7 +151,9 @@ export default function SignUpPage() {
                     <Label htmlFor="repeat-password">Confirmar contraseña</Label>
                     <Input
                       id="repeat-password"
+                      name="repeatPassword"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={repeatPassword}
                       onChange={(e) => setRepeatPassword(e.target.value)}

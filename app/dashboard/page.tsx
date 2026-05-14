@@ -10,11 +10,109 @@ import { getUserProducts, getUserFavorites } from '@/lib/supabase/queries'
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('products')
-  const [currentUser, setCurrentUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null)
+  const [currentUser, setCurrentUser] = useState<{ id: string; email?: string; user_metadata?: { full_name?: string } } | null>(null)
   const [userProfile, setUserProfile] = useState<{ full_name?: string; location?: string; bio?: string; phone?: string } | null>(null)
   const [userProducts, setUserProducts] = useState<any[]>([])
   const [favorites, setFavorites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!window.confirm('¿Eliminar este producto permanentemente?')) return
+    setActionLoading(true)
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Error al eliminar el producto')
+      }
+
+      setUserProducts((current) => current.filter((product) => product.id !== productId))
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      alert('No se pudo eliminar el producto. Intenta de nuevo.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleToggleAvailability = async (productId: string, currentAvailability: boolean) => {
+    setActionLoading(true)
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ is_available: !currentAvailability }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Error al cambiar la disponibilidad del producto')
+      }
+
+      setUserProducts((current) =>
+        current.map((product) =>
+          product.id === productId
+            ? { ...product, is_available: !currentAvailability }
+            : product
+        )
+      )
+    } catch (error) {
+      console.error('Error toggling availability:', error)
+      alert('No se pudo cambiar la disponibilidad del producto. Intenta de nuevo.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSaveProfile = async (formData: FormData) => {
+    setActionLoading(true)
+    try {
+      const supabase = createClient()
+      const updates = {
+        full_name: formData.get('fullName')?.toString().trim() || null,
+        location: formData.get('location')?.toString().trim() || null,
+        bio: formData.get('bio')?.toString().trim() || null,
+        phone: formData.get('phone')?.toString().trim() || null,
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: currentUser?.id,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+
+      if (error) throw error
+
+      // Reload profile data
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser?.id)
+        .single()
+
+      if (profile) {
+        setUserProfile(profile)
+      }
+
+      alert('Perfil actualizado correctamente')
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      alert('Error al guardar el perfil. Intenta de nuevo.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -179,8 +277,29 @@ export default function DashboardPage() {
                           {product.is_available ? 'Activo' : 'No disponible'}
                         </span>
                       </div>
-                      <Button variant="outline" size="sm">Editar</Button>
-                      <Button variant="outline" size="sm" className="text-red-600">Eliminar</Button>
+                      <div className="flex flex-col gap-2 items-end">
+                        <Link href={`/products/${product.id}/edit`}>
+                          <Button variant="outline" size="sm">Editar</Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600"
+                          onClick={() => handleDeleteProduct(product.id)}
+                          disabled={actionLoading}
+                        >
+                          Eliminar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-white bg-emerald-600 hover:bg-emerald-700 border-transparent"
+                          onClick={() => handleToggleAvailability(product.id, product.is_available)}
+                          disabled={actionLoading}
+                        >
+                          {product.is_available ? 'Marcar vendido' : 'Reactivar'}
+                        </Button>
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -216,49 +335,63 @@ export default function DashboardPage() {
             )}
 
             {activeTab === 'profile' && (
-              <div className="space-y-6 max-w-2xl">
+              <form action={handleSaveProfile} className="space-y-6 max-w-2xl">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Nombre Completo</label>
+                  <label htmlFor="profile-name" className="block text-sm font-medium text-gray-900 mb-2">Nombre Completo</label>
                   <input
+                    id="profile-name"
+                    name="fullName"
                     type="text"
                     defaultValue={userProfile?.full_name || currentUser?.user_metadata?.full_name || ''}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+                  <label htmlFor="profile-email" className="block text-sm font-medium text-gray-900 mb-2">Email</label>
                   <input
+                    id="profile-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     defaultValue={currentUser?.email || ''}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
+                    disabled
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Ubicación</label>
+                  <label htmlFor="profile-location" className="block text-sm font-medium text-gray-900 mb-2">Ubicación</label>
                   <input
+                    id="profile-location"
+                    name="location"
                     type="text"
                     defaultValue={userProfile?.location || 'CDMX, México'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Teléfono</label>
+                  <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-900 mb-2">Teléfono</label>
                   <input
+                    id="profile-phone"
+                    name="phone"
                     type="tel"
                     defaultValue={userProfile?.phone || ''}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Bio</label>
+                  <label htmlFor="profile-bio" className="block text-sm font-medium text-gray-900 mb-2">Bio</label>
                   <textarea
+                    id="profile-bio"
+                    name="bio"
                     defaultValue={userProfile?.bio || ''}
                     rows={4}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600"
                   />
                 </div>
                 <div className="flex gap-3 pt-4">
-                  <Button className="bg-green-600 hover:bg-green-700">Guardar Cambios</Button>
+                  <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={actionLoading}>
+                    {actionLoading ? 'Guardando...' : 'Guardar Cambios'}
+                  </Button>
                   <Button
                     variant="outline"
                     className="border-2 border-red-300 text-red-600 hover:bg-red-50"
@@ -267,7 +400,7 @@ export default function DashboardPage() {
                     Cerrar Sesión
                   </Button>
                 </div>
-              </div>
+              </form>
             )}
           </div>
         </div>

@@ -19,6 +19,29 @@ function ensureAbsoluteUrl(url: string, supabaseUrl?: string): string {
   return url
 }
 
+async function getProfilesByIds(supabase: any, userIds: string[]) {
+  if (userIds.length === 0) {
+    return {}
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url, location, bio, phone')
+    .in('id', userIds)
+
+  if (error) {
+    console.warn('getProfilesByIds error:', error)
+    return {}
+  }
+
+  return (data ?? []).reduce((map: Record<string, any>, profile: any) => {
+    if (profile?.id) {
+      map[profile.id] = profile
+    }
+    return map
+  }, {} as Record<string, any>)
+}
+
 // Products
 export async function getProducts(filters?: {
   category?: string
@@ -104,39 +127,6 @@ export async function getUserProducts(userId: string) {
   }
 
   return data ?? []
-}
-
-export async function getProduct(id: string) {
-  const supabase = createClient()
-
-  const { data, error } = await supabase
-    .from('products')
-    .select(`
-      *,
-      profiles:user_id (
-        full_name,
-        avatar_url,
-        location,
-        bio,
-        phone
-      ),
-      categories (
-        name,
-        slug
-      )
-    `)
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
-
-  // Increment views
-  await supabase
-    .from('products')
-    .update({ views_count: (data.views_count || 0) + 1 })
-    .eq('id', id)
-
-  return data
 }
 
 export async function createProduct(productData: {
@@ -272,11 +262,6 @@ export async function getUserFavorites(userId: string) {
     .from('products')
     .select(`
       *,
-      profiles:user_id (
-        full_name,
-        avatar_url,
-        location
-      ),
       categories (
         name,
         slug
@@ -289,7 +274,16 @@ export async function getUserFavorites(userId: string) {
     return []
   }
 
-  return products ?? []
+  const userIds = Array.from(
+    new Set((products ?? []).map((product: any) => product.user_id).filter(Boolean))
+  ) as string[]
+
+  const profileMap = await getProfilesByIds(supabase, userIds)
+
+  return (products ?? []).map((product: any) => ({
+    ...product,
+    profiles: profileMap[product.user_id] ?? null,
+  }))
 }
 
 export async function toggleFavorite(userId: string, productId: string) {
@@ -332,14 +326,6 @@ export async function getUserConversations(userId: string) {
     .from('messages')
     .select(`
       *,
-      sender:profiles!sender_id (
-        full_name,
-        avatar_url
-      ),
-      receiver:profiles!receiver_id (
-        full_name,
-        avatar_url
-      ),
       products (
         title
       )
@@ -352,14 +338,28 @@ export async function getUserConversations(userId: string) {
     throw error
   }
 
-  console.log('getUserConversations data:', data) // Debug log
+  const messages = data ?? []
+  const userIds = Array.from(
+    new Set(
+      messages
+        .flatMap((message: any) => [message.sender_id, message.receiver_id])
+        .filter(Boolean)
+    )
+  ) as string[]
+
+  const profileMap = await getProfilesByIds(supabase, userIds)
+
+  console.log('getUserConversations data:', messages) // Debug log
 
   // Group by conversation (other user + product)
   const conversations = new Map()
 
-  data.forEach(message => {
+  messages.forEach((message: any) => {
     const otherUserId = message.sender_id === userId ? message.receiver_id : message.sender_id
-    const otherUser = message.sender_id === userId ? message.receiver : message.sender
+    const otherUser = profileMap[otherUserId] ?? {
+      full_name: 'Usuario',
+      avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUserId}`,
+    }
     const key = `${otherUserId}-${message.product_id || 'general'}`
 
     if (!conversations.has(key)) {
@@ -377,22 +377,27 @@ export async function getUserConversations(userId: string) {
       })
     }
 
+    const senderProfile = profileMap[message.sender_id] ?? {
+      full_name: message.sender_id === userId ? 'Tú' : 'Usuario',
+      avatar_url: message.sender_id === userId
+        ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`
+        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${message.sender_id}`,
+    }
+
     conversations.get(key).messages.push({
       id: message.id,
       senderId: message.sender_id,
-      senderName: message.sender_id === userId ? 'Tú' : otherUser.full_name || 'Usuario',
-      senderAvatar: message.sender_id === userId
-        ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`
-        : otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUserId}`,
+      senderName: message.sender_id === userId ? 'Tú' : senderProfile.full_name || 'Usuario',
+      senderAvatar: senderProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${message.sender_id}`,
       content: message.content,
       timestamp: formatTime(message.created_at),
       isRead: message.is_read
     })
   })
 
-  return Array.from(conversations.values()).map(conv => ({
+  return Array.from(conversations.values()).map((conv) => ({
     ...conv,
-    messages: conv.messages.reverse() // Most recent first
+    messages: conv.messages.reverse(), // Most recent first
   }))
 }
 

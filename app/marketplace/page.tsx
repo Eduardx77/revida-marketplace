@@ -120,7 +120,9 @@ export default function MarketplacePage() {
         <div className="mb-8">
           <div className="relative">
             <Input
+              name="search"
               type="text"
+              aria-label="Buscar productos o ubicación"
               placeholder="Buscar productos o ubicación..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
