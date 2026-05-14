@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import { getProduct } from '@/lib/supabase/server-queries'
 import ProductPageContent from '@/components/product-page-content'
 
@@ -21,7 +20,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   if (invalidId) {
     console.warn('⚠️ Product detail page missing or invalid id parameter:', params.id)
-    return notFound()
+    return <ProductLoadErrorPage productId={productId} message="ID inválido o no proporcionado." />
   }
 
   let product: any = null
@@ -37,7 +36,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   if (!product || typeof product !== 'object') {
     console.warn('⚠️ Product detail page received no product or invalid payload for ID:', productId, product)
-    return notFound()
+    return <ProductLoadErrorPage productId={productId} message="Producto no encontrado." />
   }
 
   return <ProductPageContent product={product} productId={productId} />
