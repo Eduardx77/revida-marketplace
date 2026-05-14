@@ -4,22 +4,27 @@ import ProductPageContent from '@/components/product-page-content'
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function ProductDetailPage({ params }: Props) {
-  const productIdRaw = Array.isArray(params.id) ? params.id[0] : params.id
+  // In Next.js 16, params is a Promise
+  const resolvedParams = await params
+  const productIdRaw = Array.isArray(resolvedParams.id) ? resolvedParams.id[0] : resolvedParams.id
   const productId = String(productIdRaw ?? '').trim()
   const invalidId =
     !productId ||
     ['undefined', 'null', 'desconocido'].includes(productId.toLowerCase())
 
-  console.log('🔍 ProductDetailPage - Loading ID:', productId)
+  console.log('🔍 ProductDetailPage - Resolved params:', resolvedParams)
+  console.log('🔍 ProductDetailPage - productIdRaw:', productIdRaw)
+  console.log('🔍 ProductDetailPage - productId:', productId)
+  console.log('🔍 ProductDetailPage - invalidId:', invalidId)
 
   if (invalidId) {
-    console.warn('⚠️ Product detail page missing or invalid id parameter:', params.id)
+    console.warn('⚠️ Product detail page missing or invalid id parameter:', productIdRaw)
     return <ProductLoadErrorPage productId={productId} message="ID inválido o no proporcionado." />
   }
 
@@ -30,8 +35,9 @@ export default async function ProductDetailPage({ params }: Props) {
     product = JSON.parse(JSON.stringify(product))
     console.log('✅ Product loaded:', product?.title, '(ID:', product?.id, ')')
   } catch (err) {
-    console.error('❌ Error loading product:', err)
-    return <ProductLoadErrorPage productId={productId} message="No se pudo cargar este producto en este momento." />
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.error('❌ Error loading product ID', productId, ':', errorMsg, err)
+    return <ProductLoadErrorPage productId={productId} message={`Error: ${errorMsg}`} />
   }
 
   if (!product || typeof product !== 'object') {

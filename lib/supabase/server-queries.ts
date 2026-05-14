@@ -31,8 +31,14 @@ export async function getProduct(id: string) {
     .eq('id', id)
     .single()
 
-  if (productError) throw productError
-  if (!product) throw new Error('Producto no encontrado')
+  if (productError) {
+    console.error('❌ getProduct query error for ID:', id, productError)
+    throw productError
+  }
+  if (!product) {
+    console.error('❌ getProduct: no product found for ID:', id)
+    throw new Error('Producto no encontrado')
+  }
 
   let profile = null
   if (product.user_id) {
